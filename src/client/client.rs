@@ -35,6 +35,6 @@ fn login() -> Result<String, ureq::Error> {
     Ok(user_uuid)
 }
 
-fn execute_command(input: &String, user_session : &str) -> Result<String, ureq::Error> {
+fn execute_command(_input: &str, _user_session : &str) -> Result<String, ureq::Error> {
     todo!()
 }
