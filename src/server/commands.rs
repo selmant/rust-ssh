@@ -1,5 +1,4 @@
-use std::fmt::{self, write, Display};
-
+#[derive(Debug)]
 pub(crate) enum Commands<'a> {
     Mkdir {
         path: &'a str,
@@ -40,6 +39,59 @@ pub(crate) enum Commands<'a> {
     UnknowCommand,
 }
 
+struct Opts<'a> {
+    command: &'a str,
+    single_dash_options: Vec<&'a str>,
+    double_dash_options: Vec<&'a str>,
+    non_options: Vec<&'a str>,
+}
+
+impl<'a> Opts<'a> {
+    fn new(mut words: Vec<&'a str>) -> Opts<'a> {
+        let command = words.remove(0);
+        let non_options = words
+            .iter()
+            .filter(|&&word| !word.starts_with('-'))
+            .cloned()
+            .collect();
+        let double_dash_options = words
+            .iter()
+            .filter(|&&word| word.starts_with("--"))
+            .cloned()
+            .collect();
+        let single_dash_options = words
+            .iter()
+            .filter(|&&word| word.starts_with('-') && !word.starts_with("--"))
+            .cloned()
+            .collect();
+        Opts {
+            command,
+            single_dash_options,
+            double_dash_options,
+            non_options,
+        }
+    }
+    fn is_exist(&self, double_dash: Option<&str>, single_dash: Option<char>) -> bool {
+        let mut exist = false;
+        if let Some(double) = double_dash {
+            exist = self
+                .double_dash_options
+                .iter()
+                .any(|&word| format!("--{}", double).as_str() == word);
+        }
+        if let Some(single) = single_dash {
+            exist = self
+                .single_dash_options
+                .iter()
+                .any(|&word| word.contains(single));
+        }
+        exist
+    }
+    fn nth_non_option(&self, index: usize) -> &'a str {
+        self.non_options[index]
+    }
+}
+
 impl<'a> Commands<'a> {
     fn as_string(&self) -> String {
         match self {
@@ -57,87 +109,70 @@ impl<'a> Commands<'a> {
         }
     }
     pub(crate) fn new(command: &'a str) -> Commands<'a> {
-        let mut split = command.split(' ');
+        let words = command.split(' ').collect();
+        let opts = Opts::new(words);
 
-        match split.next() {
-            Some("mkdir") => Commands::generate_mkdir(split),
-            Some("rm") => Commands::generate_rm(split),
-            Some("rmdir") => Commands::generate_rmdir(split),
-            Some("ls") => Commands::generate_ls(split),
-            Some("cp") => Commands::generate_cp(split),
-            Some("mv") => Commands::generate_mv(split),
-            Some("touch") => Commands::generate_touch(split),
-            Some("pwd") => Commands ::Pwd,
-            Some("pushd") => Commands::Pushd,
-            Some("popd") => Commands::Popd,
-            Some(_) => Commands::UnknowCommand,
-            None => Commands::UnknowCommand,
+        match opts.command {
+            "mkdir" => Commands::generate_mkdir(opts),
+            "rm" => Commands::generate_rm(opts),
+            "rmdir" => Commands::generate_rmdir(opts),
+            "ls" => Commands::generate_ls(opts),
+            "cp" => Commands::generate_cp(opts),
+            "mv" => Commands::generate_mv(opts),
+            "touch" => Commands::generate_touch(opts),
+            "pwd" => Commands::Pwd,
+            "pushd" => Commands::Pushd,
+            "popd" => Commands::Popd,
+            _ => Commands::UnknowCommand,
         }
     }
 
-    fn generate_cp(mut split: std::str::Split<char>) -> Commands {
+    fn generate_cp(opts: Opts) -> Commands {
         //let recursive= split.filter(|&word| word == "--recursive");
-        let words : Vec<&str> = split.collect();
-        let source_and_des = words.iter().filter(|&&word| !word.starts_with('-'));
-        let double_dash_options =words.iter().filter(|&&word| word.starts_with("--"));
-        let single_dash_options=words.iter().filter(|&&word| word.starts_with('-') && word.starts_with("--"));
         Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+            source: opts.nth_non_option(0),
+            destination: opts.nth_non_option(1),
+            recursive: opts.is_exist(Some("recursive"), Some('r')),
+            symlink: opts.is_exist(Some("link"), Some('l')),
         }
     }
-    fn generate_rm(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_rm(opts: Opts) -> Commands {
+        Commands::Rm {
+            path: opts.nth_non_option(0),
+            recursive: opts.is_exist(Some("recursive"), Some('r')),
+            directory: opts.is_exist(Some("directory"), Some('d')),
         }
     }
-    fn generate_rmdir(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_rmdir(opts: Opts) -> Commands {
+        Commands::Rmdir {
+            path: opts.nth_non_option(0),
+            parent: opts.is_exist(Some("parent"), Some('p')),
         }
     }
-    fn generate_ls(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_ls(opts: Opts) -> Commands {
+        Commands::Ls {
+            all: opts.is_exist(Some("all"), Some('a')),
+            almost_all: opts.is_exist(Some("almost-all"), Some('A')),
+            list: opts.is_exist(Some("list"), Some('l')),
+            reverse: opts.is_exist(Some("reverse"), Some('r')),
+            recursive: opts.is_exist(Some("recursive"), Some('R')),
         }
     }
-    fn generate_touch(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_touch(opts: Opts) -> Commands {
+        Commands::Touch {
+            file: opts.nth_non_option(0),
         }
     }
-    fn generate_mv(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_mv(opts: Opts) -> Commands {
+        Commands::Mv {
+            source: opts.nth_non_option(0),
+            destination: opts.nth_non_option(1),
         }
     }
-    fn generate_mkdir(mut split: std::str::Split<char>) -> Commands {
-        Commands::Cp {
-            source: "val",
-            destination: "val",
-            recursive: true,
-            symlink: true,
+    fn generate_mkdir(opts: Opts) -> Commands {
+        Commands::Mkdir {
+            path: opts.nth_non_option(0),
+            parent: opts.is_exist(Some("parent"), Some('p')),
         }
-    }
-
-    fn extract_single_dash_option() -> bool{
-        false
     }
 }

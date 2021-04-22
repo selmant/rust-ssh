@@ -1,5 +1,7 @@
 mod commands;
 
 fn main() {
-    commands::Commands::new("cp asd assd -p");
+    let cp = commands::Commands::new("cp asd assd -r");
+    let mv = commands::Commands::new("mv asd assd -p");
+    println!("{:?}\n{:?}",cp,mv);
 }
