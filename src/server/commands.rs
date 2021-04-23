@@ -33,6 +33,9 @@ pub(crate) enum Commands<'a> {
     Touch {
         file: &'a str,
     },
+    Cd {
+        path: &'a str
+    },
     Pwd,
     Pushd,
     Popd,
@@ -93,7 +96,7 @@ impl<'a> Opts<'a> {
 }
 
 impl<'a> Commands<'a> {
-    fn as_string(&self) -> String {
+    pub(crate) fn as_string(&self) -> String {
         match self {
             Commands::Mkdir { .. } => "mkdir".to_string(),
             Commands::Rm { .. } => "rm".to_string(),
@@ -102,6 +105,7 @@ impl<'a> Commands<'a> {
             Commands::Cp { .. } => "cp".to_string(),
             Commands::Mv { .. } => "mv".to_string(),
             Commands::Touch { .. } => "touch".to_string(),
+            Commands::Cd {..} => "cd".to_string(),
             Commands::Pwd => "pwd".to_string(),
             Commands::Pushd => "pushd".to_string(),
             Commands::Popd => "popd".to_string(),
@@ -120,6 +124,7 @@ impl<'a> Commands<'a> {
             "cp" => Commands::generate_cp(opts),
             "mv" => Commands::generate_mv(opts),
             "touch" => Commands::generate_touch(opts),
+            "cd" => Commands::generate_cd(opts),
             "pwd" => Commands::Pwd,
             "pushd" => Commands::Pushd,
             "popd" => Commands::Popd,
@@ -173,6 +178,11 @@ impl<'a> Commands<'a> {
         Commands::Mkdir {
             path: opts.nth_non_option(0),
             parent: opts.is_exist(Some("parent"), Some('p')),
+        }
+    }
+    fn generate_cd(opts: Opts) -> Commands {
+        Commands::Cd {
+            path: opts.nth_non_option(0)
         }
     }
 }

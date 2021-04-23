@@ -1,14 +1,17 @@
-use std::io::stdin;
-const SERVER_IP: &str = "http://192.168.0.17:3000";
+use std::{io::{Read, Write, stdin}, net::TcpStream};
+use std::io::{BufWriter, BufReader};
+const SERVER_IP: &str = "192.168.0.17:3000";
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let user_session = login().expect("Couldn't connect to server.");
+fn main(){
+    let stream = TcpStream::connect(SERVER_IP).expect("couldn't connect to server");
+    let stream_clone = stream.try_clone().unwrap();
+    let mut reader = BufReader::new(stream);
+    let mut writer = BufWriter::new(stream_clone);
 
-    input_loop(&user_session)?;
-    Ok(())
+    input_loop(writer,reader);
 }
 
-fn input_loop(user_session : &str) -> Result<(), Box<dyn std::error::Error>> {
+fn input_loop(mut writer: BufWriter<TcpStream>, mut reader: BufReader<TcpStream>) {
     println!("Console is active. Please enter your command (type quit/q for exit");
     let mut input = String::new();
     loop {
@@ -20,21 +23,20 @@ fn input_loop(user_session : &str) -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        let output: String = execute_command(&input, user_session)?;
-        println!("{}", output.as_str());
+        
+        let output: String = execute_command(&input, &mut writer, &mut reader);
+        input.clear();
+        println!("{}", output);
     }
-    Ok(())
 }
 
-fn login() -> Result<String, ureq::Error> {
-    let user_uuid: String = ureq::get(format!("{}/login", SERVER_IP).as_str())
-        //.set("Example-Header", "header value")
-        //.query("username", "selman")
-        .call()?
-        .into_string()?;
-    Ok(user_uuid)
-}
+fn execute_command(mut input: &str, mut writer: &mut std::io::BufWriter<std::net::TcpStream>, mut reader: &mut BufReader<TcpStream>) -> String {
+    let mut output: String = String::new();
 
-fn execute_command(_input: &str, _user_session : &str) -> Result<String, ureq::Error> {
-    todo!()
+    writer.write_all(input.as_bytes()).unwrap();
+    //user_session.write_all(input.as_bytes());
+    writer.flush().unwrap();
+    println!("writed");
+    //user_session.read_to_string(&mut output);
+    output
 }

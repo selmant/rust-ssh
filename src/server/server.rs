@@ -3,6 +3,8 @@ mod io;
 mod commands;
 
 use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
+use std::path::Path;
 use std::thread;
 const SERVER_IP: &str = "192.168.0.17:3000";
 
@@ -11,11 +13,14 @@ fn main() {
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        thread::spawn(|| {
+        thread::spawn(move|| {
             handle_connection(stream);
         });
     }
-    //let cp = commands::Commands::new("cp asd assd -r");
+    let path =Path::new("/home/selmant/Documents/../Downloads");
+    for item in path.read_dir().unwrap() {
+        println!("{:?}",item.unwrap());
+    }
     let string = "mv asd assd -p".to_string();
     let str = &string[..];
     println!("{}", str.len());
