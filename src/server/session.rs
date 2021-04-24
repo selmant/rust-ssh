@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::{io::prelude::*, io::BufReader, io::BufWriter};
 const DEFAULT_PATH: &str = "/home/selmant";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const FLAG_BYTE: u8 = 3;
 
 pub(crate) struct UserSession {
     stream: TcpStream,
@@ -22,25 +23,39 @@ impl UserSession {
 
     pub(crate) fn start_session(&mut self) {
         let stream_clone = self.stream.try_clone().unwrap();
-        let stream_clone2 = self.stream.try_clone().unwrap();
-
         let mut reader = BufReader::new(stream_clone);
-        let mut writer = BufWriter::new(stream_clone2);
+        
+        let mut buf = Vec::new();
+
         loop {
-            for res in reader.by_ref().lines() {
-                if let Ok(line) = res {
-                    println!("Received line: {}", line);
-                    self.perform_operations(line.as_str());
-                }
+            let n = reader.read_until(FLAG_BYTE, &mut buf).expect("asd");
+            if n == 0 {
+                break;
             }
-            //reader.read_until('\u', buf)
+            //Pop FLAG_BYTE from buffer.
+            buf.pop();
+            let s = String::from_utf8(buf.clone()).expect("invalid ut-8");
+            self.perform_operations(s.as_str());
+            buf.clear();
         }
         //
     }
     fn perform_operations(&mut self, input: &str) {
+        let stream_clone = self.stream.try_clone().unwrap();
+        let mut writer = BufWriter::new(stream_clone);
+
         let command = Commands::new(input);
         println!("{:?}", command);
         let output = self.io_handler.perform_operation(command).unwrap();
+        if let Some(x) = output{
+            let mut bytes =x.into_bytes();
+            bytes.push(FLAG_BYTE);
+            println!("writed");
+            writer.write_all(&bytes).expect("error");
+            writer.flush().unwrap();
+        }
+        
+        
     }
 }
 

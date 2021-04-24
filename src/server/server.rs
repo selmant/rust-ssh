@@ -3,7 +3,6 @@ mod io;
 mod commands;
 
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
 use std::path::Path;
 use std::thread;
 const SERVER_IP: &str = "192.168.0.17:3000";
