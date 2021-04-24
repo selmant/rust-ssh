@@ -37,6 +37,11 @@ impl IOOperationHandler {
             Commands::UnknowCommand => Ok(None),
         }
     }
+
+    fn pushd(&mut self, command: Commands) -> Option<String> {
+        None
+    
+    }
     fn cd(&mut self, command: Commands) -> Result<Option<String>, std::io::Error> {
         if let Commands::Cd { path } = command {
             self.working_directory.push(path);

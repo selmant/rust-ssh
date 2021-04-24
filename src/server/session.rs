@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{io::prelude::*, io::BufReader, io::BufWriter};
 const DEFAULT_PATH: &str = "/home/selmant";
-const IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 const FLAG_BYTE: u8 = 3;
 
 pub(crate) struct UserSession {
@@ -17,6 +17,7 @@ impl UserSession {
     pub(crate) fn new(stream: TcpStream) -> UserSession {
         let wd = PathBuf::from_str(DEFAULT_PATH).unwrap();
         let io_handler = IOOperationHandler::new(wd);
+        stream.set_read_timeout(Some(IDLE_TIMEOUT)).unwrap();
 
         UserSession { stream, io_handler }
     }
@@ -24,14 +25,20 @@ impl UserSession {
     pub(crate) fn start_session(&mut self) {
         let stream_clone = self.stream.try_clone().unwrap();
         let mut reader = BufReader::new(stream_clone);
-        
+
         let mut buf = Vec::new();
 
         loop {
-            let n = reader.read_until(FLAG_BYTE, &mut buf).expect("asd");
-            if n == 0 {
-                break;
-            }
+            match reader.read_until(FLAG_BYTE, &mut buf) {
+                Ok(0) => break,
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::WouldBlock {
+                        panic!("{}", e);
+                    }
+                    break;
+                }
+            };
             //Pop FLAG_BYTE from buffer.
             buf.pop();
             let s = String::from_utf8(buf.clone()).expect("invalid ut-8");
@@ -47,15 +54,13 @@ impl UserSession {
         let command = Commands::new(input);
         println!("{:?}", command);
         let output = self.io_handler.perform_operation(command).unwrap();
-        if let Some(x) = output{
-            let mut bytes =x.into_bytes();
+        if let Some(x) = output {
+            let mut bytes = x.into_bytes();
             bytes.push(FLAG_BYTE);
             println!("writed");
             writer.write_all(&bytes).expect("error");
             writer.flush().unwrap();
         }
-        
-        
     }
 }
 
