@@ -1,6 +1,6 @@
-mod session;
-mod io;
 mod commands;
+mod io;
+mod session;
 
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -12,7 +12,7 @@ fn main() {
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         println!("{:?}", stream);
-        thread::spawn(move|| {
+        thread::spawn(move || {
             handle_connection(stream);
         });
     }
