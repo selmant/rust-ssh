@@ -1,5 +1,5 @@
 use std::{
-    io::{stdin, BufRead, Write},
+    io::{stdin, stdout, BufRead, Write},
     net::TcpStream,
 };
 use std::{
@@ -16,20 +16,23 @@ fn main() {
 }
 
 fn input_loop(client: &mut Client) {
-    println!("Console is active. Please enter your command (type quit/q for exit");
+    println!("Console is active. Please enter your command (type quit/q for exit :");
     let mut input = String::new();
     loop {
+        println!();
+        print!("\x1b[0;31m{}> \x1b[0m",client.wd);
+        stdout().flush().unwrap();
         stdin()
             .read_line(&mut input)
             .expect("Did not enter a correct string");
 
-        if input.eq("q") || input.eq("quit") {
+        if input.eq("q\n") || input.eq("quit\n") {
             break;
         }
 
         let output: String = client.execute_command(input.as_str());
         input.clear();
-        println!("{}", output);
+        println!("  {}", output);
     }
 }
 
@@ -45,7 +48,9 @@ impl Client {
         let socket_clone = socket.try_clone().unwrap();
         let reader = BufReader::new(socket);
         let writer = BufWriter::new(socket_clone);
-        Client { wd, reader, writer }
+        let mut client = Client { wd, reader, writer };
+        client.wd = client.execute_command("pwd\n");
+        client
     }
 
     fn execute_command(&mut self, input: &str) -> String {
@@ -59,7 +64,7 @@ impl Client {
             }
         }
         self.writer.flush().unwrap();
-        println!("writed");
+        //println!("writed");
 
         let mut output_buf: Vec<u8> = Vec::new();
         let n = match self.reader.read_until(FLAG_BYTE, &mut output_buf) {
@@ -86,7 +91,7 @@ impl Client {
     fn restore_session_and_try_again(&mut self, input: &str) -> String {
         let new_connection = TcpStream::connect(SERVER_IP).expect("couldn't connect to server");
         *self = Client::new(new_connection);
-        self.execute_command(format!("cd {}", self.wd).as_str());
+        self.wd = self.execute_command(format!("cd {}\n", self.wd).as_str());
         self.execute_command(input)
     }
 }

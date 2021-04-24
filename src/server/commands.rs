@@ -1,4 +1,5 @@
 #[derive(Debug)]
+#[derive(Clone)]
 pub(crate) enum Commands<'a> {
     Mkdir {
         path: &'a str,
@@ -41,7 +42,9 @@ pub(crate) enum Commands<'a> {
         path: &'a str,
     },
     Popd,
-    UnknowCommand,
+    UnknowCommand{
+        command: &'a str,
+    },
 }
 
 struct Opts<'a> {
@@ -99,19 +102,20 @@ impl<'a> Opts<'a> {
 
 impl<'a> Commands<'a> {
     pub(crate) fn as_string(&self) -> String {
+        use Commands::*;
         match self {
-            Commands::Mkdir { .. } => "mkdir".to_string(),
-            Commands::Rm { .. } => "rm".to_string(),
-            Commands::Rmdir { .. } => "rmdir".to_string(),
-            Commands::Ls { .. } => "ls".to_string(),
-            Commands::Cp { .. } => "cp".to_string(),
-            Commands::Mv { .. } => "mv".to_string(),
-            Commands::Touch { .. } => "touch".to_string(),
-            Commands::Cd { .. } => "cd".to_string(),
-            Commands::Pwd => "pwd".to_string(),
-            Commands::Pushd { .. } => "pushd".to_string(),
-            Commands::Popd => "popd".to_string(),
-            Commands::UnknowCommand => "unknown".to_string(),
+            Mkdir { .. } => "mkdir".to_string(),
+            Rm { .. } => "rm".to_string(),
+            Rmdir { .. } => "rmdir".to_string(),
+            Ls { .. } => "ls".to_string(),
+            Cp { .. } => "cp".to_string(),
+            Mv { .. } => "mv".to_string(),
+            Touch { .. } => "touch".to_string(),
+            Cd { .. } => "cd".to_string(),
+            Pwd => "pwd".to_string(),
+            Pushd { .. } => "pushd".to_string(),
+            Popd => "popd".to_string(),
+            UnknowCommand{command} => command.to_string(),
         }
     }
     pub(crate) fn new(command: &'a str) -> Commands<'a> {
@@ -130,10 +134,14 @@ impl<'a> Commands<'a> {
             "pwd" => Commands::Pwd,
             "pushd" => Commands::generate_pushd(opts),
             "popd" => Commands::Popd,
-            _ => Commands::UnknowCommand,
+            _ => Commands::generate_unknown(opts),
         }
     }
-
+    fn generate_unknown(opts: Opts) -> Commands {
+        Commands::UnknowCommand {
+            command: opts.command,
+        }
+    }
     fn generate_cp(opts: Opts) -> Commands {
         //let recursive= split.filter(|&word| word == "--recursive");
         Commands::Cp {

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{io::prelude::*, io::BufReader, io::BufWriter};
 pub const DEFAULT_PATH: &str = "/home/selmant";
-const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
+const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const FLAG_BYTE: u8 = 3;
 
 pub(crate) struct UserSession {
@@ -53,19 +53,30 @@ impl UserSession {
 
         let command = Commands::new(input);
         println!("{:?}", command);
-        let output = self.io_handler.perform_operation(command).unwrap();
-        if let Some(x) = output {
-            let mut bytes = x.into_bytes();
-            bytes.push(FLAG_BYTE);
-            println!("writed");
-            writer.write_all(&bytes).expect("error");
-            writer.flush().unwrap();
+        let result = self.io_handler.perform_operation(command.clone());
+        let output = match result {
+            Ok(value) => value,
+            Err(e) => Some(format!("{}: {}", command.as_string(), e)),
+        };
+        let output = output.unwrap_or_else(|| "ok".to_string());
+        let mut bytes = output.into_bytes();
+        bytes.push(FLAG_BYTE);
+        println!("writed");
+        if let Err(e) = writer.write_all(&bytes) {
+            if e.kind() != std::io::ErrorKind::WouldBlock {
+                panic!("{}", e);
+            }
+        }
+        if let Err(e) = writer.flush() {
+            if e.kind() != std::io::ErrorKind::WouldBlock {
+                panic!("{}", e);
+            }
         }
     }
 }
 
 impl Drop for UserSession {
     fn drop(&mut self) {
-        println!("UserSession dropped.");
+        println!("{:?} UserSession dropped.", self.stream);
     }
 }

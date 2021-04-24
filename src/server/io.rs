@@ -2,7 +2,7 @@ use crate::commands::Commands::{
     self, Cd, Cp, Ls, Mkdir, Mv, Popd, Pushd, Pwd, Rm, Rmdir, Touch, UnknowCommand,
 };
 use std::{
-    fs::{self, remove_dir, remove_dir_all, DirEntry},
+    fs::{self, DirEntry},
     io::Error,
     path::{Path, PathBuf},
 };
@@ -30,14 +30,63 @@ impl IOOperationHandler {
             Mkdir { .. } => self.mkdir(command),
             Rm { .. } => self.rm(command),
             Rmdir { .. } => self.rmdir(command),
-            Cp { .. } => Ok(None),
-            Mv { .. } => Ok(None),
-            Touch { .. } => Ok(None),
+            Cp { .. } => self.cp(command),
+            Mv { .. } => self.mv(command),
+            Touch { .. } => self.touch(command),
             Pwd => Ok(self.pwd(command)),
             Pushd { .. } => Ok(self.pushd(command)),
             Popd => self.popd(command),
-            UnknowCommand => Ok(None),
+            UnknowCommand {..} => self.unkown_command(command),
         }
+    }
+
+    fn cp(&self, command: Commands) -> std::io::Result<Option<String>> {
+        if let Cp {
+            source,
+            destination,
+            recursive,
+            symlink,
+        } = command
+        {
+            if symlink {
+                std::os::unix::fs::symlink(source, destination)?;
+            } else {
+                fs::copy(source, destination)?;
+            }
+        }
+        Ok(None)
+    }
+    fn mv(&self, command: Commands) -> std::io::Result<Option<String>> {
+        if let Mv {
+            source,
+            destination,
+        } = command
+        {
+            let source_path = PathBuf::from(source);
+            match source_path.metadata().unwrap().permissions().readonly() {
+                true => fs::remove_file(source_path)?,
+                false => {
+                    fs::copy(source, destination)?;
+                    fs::remove_file(source)?;
+                }
+            }
+        }
+        Ok(None)
+    }
+    fn touch(&self, command: Commands) -> std::io::Result<Option<String>> {
+        if let Touch { file } = command {
+            let path = PathBuf::from(file);
+            if path.is_file(){
+                fs::File::open(path)?;
+            }
+            else{
+                fs::File::create(file)?;
+            } 
+        }
+        Ok(None)
+    }
+    fn unkown_command(&self, command: Commands) -> std::io::Result<Option<String>> {
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Command not found."))
     }
     fn rmdir(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Rmdir { path, parent } = command {
@@ -45,8 +94,8 @@ impl IOOperationHandler {
             let mut remove_leaf_path = self.working_directory.clone();
             remove_leaf_path.push(path);
             match parent {
-                false => remove_dir(remove_leaf_path)?,
-                true => remove_dir_all(remove_leaf_path)?,
+                false => fs::remove_dir(remove_leaf_path)?,
+                true => fs::remove_dir_all(remove_leaf_path)?,
             }
         };
         Ok(None)
