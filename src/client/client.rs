@@ -69,7 +69,7 @@ impl Client {
         output_buf.pop();
 
         let output = String::from_utf8(output_buf).unwrap();
-        if (input.starts_with("cd ") && !output.starts_with("cd: no such"))
+        if (input.starts_with("cd ") && !output.starts_with("cd: "))
             || input == "popd" && !output.starts_with("popd: directory")
         {
             self.wd = output.clone();

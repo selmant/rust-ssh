@@ -9,7 +9,8 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const FLAG_BYTE: u8 = 3;
 
 pub(crate) struct UserSession {
-    stream: TcpStream,
+    reader: BufReader<TcpStream>,
+    writer: BufWriter<TcpStream>,
     io_handler: IOOperationHandler,
 }
 
@@ -17,19 +18,26 @@ impl UserSession {
     pub(crate) fn new(stream: TcpStream) -> UserSession {
         let wd = PathBuf::from_str(DEFAULT_PATH).unwrap();
         let io_handler = IOOperationHandler::new(wd);
-        stream.set_read_timeout(Some(IDLE_TIMEOUT)).unwrap();
 
-        UserSession { stream, io_handler }
+        stream.set_read_timeout(Some(IDLE_TIMEOUT)).unwrap();
+        let stream_clone = stream.try_clone().unwrap();
+        let reader = BufReader::new(stream);
+        let writer = BufWriter::new(stream_clone);
+        UserSession {
+            reader,
+            writer,
+            io_handler,
+        }
     }
 
     pub(crate) fn start_session(&mut self) {
-        let stream_clone = self.stream.try_clone().unwrap();
-        let mut reader = BufReader::new(stream_clone);
+        //let stream_clone = self.stream.try_clone().unwrap();
+        //let mut reader = BufReader::new(stream_clone);
 
         let mut buf = Vec::new();
 
         loop {
-            match reader.read_until(FLAG_BYTE, &mut buf) {
+            match self.reader.read_until(FLAG_BYTE, &mut buf) {
                 Ok(0) => break,
                 Ok(bytes) => bytes,
                 Err(e) => {
@@ -47,8 +55,8 @@ impl UserSession {
         }
     }
     fn perform_operations(&mut self, input: &str) {
-        let stream_clone = self.stream.try_clone().unwrap();
-        let mut writer = BufWriter::new(stream_clone);
+        //let stream_clone = self.stream.try_clone().unwrap();
+        //let mut writer = BufWriter::new(stream_clone);
 
         let command = Commands::new(input);
         println!("{:?}", command);
@@ -61,12 +69,12 @@ impl UserSession {
         let mut bytes = output.into_bytes();
         bytes.push(FLAG_BYTE);
         println!("writed");
-        if let Err(e) = writer.write_all(&bytes) {
+        if let Err(e) = self.writer.write_all(&bytes) {
             if e.kind() != std::io::ErrorKind::WouldBlock {
                 panic!("{}", e);
             }
         }
-        if let Err(e) = writer.flush() {
+        if let Err(e) = self.writer.flush() {
             if e.kind() != std::io::ErrorKind::WouldBlock {
                 panic!("{}", e);
             }
@@ -76,6 +84,6 @@ impl UserSession {
 
 impl Drop for UserSession {
     fn drop(&mut self) {
-        println!("{:?} UserSession dropped.", self.stream);
+        println!("{:?} UserSession dropped.", self.reader.get_ref());
     }
 }

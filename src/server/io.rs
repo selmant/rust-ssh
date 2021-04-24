@@ -177,10 +177,10 @@ impl IOOperationHandler {
     }
     fn cd(&mut self, command: Commands) -> std::io::Result<Option<String>> {
         if let Cd { path } = command {
-            self.working_directory.push(path);
-            self.working_directory.read_dir()?;
-
-            self.working_directory = self.working_directory.canonicalize()?;
+            let mut new_dir = self.working_directory.clone();
+            new_dir.push(path);
+            new_dir.read_dir()?;
+            self.working_directory = new_dir.canonicalize()?;
 
             return Ok(self.pwd(Pwd));
         }
