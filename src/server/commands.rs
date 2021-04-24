@@ -34,10 +34,12 @@ pub(crate) enum Commands<'a> {
         file: &'a str,
     },
     Cd {
-        path: &'a str
+        path: &'a str,
     },
     Pwd,
-    Pushd,
+    Pushd {
+        path: &'a str,
+    },
     Popd,
     UnknowCommand,
 }
@@ -105,9 +107,9 @@ impl<'a> Commands<'a> {
             Commands::Cp { .. } => "cp".to_string(),
             Commands::Mv { .. } => "mv".to_string(),
             Commands::Touch { .. } => "touch".to_string(),
-            Commands::Cd {..} => "cd".to_string(),
+            Commands::Cd { .. } => "cd".to_string(),
             Commands::Pwd => "pwd".to_string(),
-            Commands::Pushd => "pushd".to_string(),
+            Commands::Pushd { .. } => "pushd".to_string(),
             Commands::Popd => "popd".to_string(),
             Commands::UnknowCommand => "unknown".to_string(),
         }
@@ -126,7 +128,7 @@ impl<'a> Commands<'a> {
             "touch" => Commands::generate_touch(opts),
             "cd" => Commands::generate_cd(opts),
             "pwd" => Commands::Pwd,
-            "pushd" => Commands::Pushd,
+            "pushd" => Commands::generate_pushd(opts),
             "popd" => Commands::Popd,
             _ => Commands::UnknowCommand,
         }
@@ -182,7 +184,12 @@ impl<'a> Commands<'a> {
     }
     fn generate_cd(opts: Opts) -> Commands {
         Commands::Cd {
-            path: opts.nth_non_option(0)
+            path: opts.nth_non_option(0),
+        }
+    }
+    fn generate_pushd(opts: Opts) -> Commands {
+        Commands::Pushd {
+            path: opts.nth_non_option(0),
         }
     }
 }

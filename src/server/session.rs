@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io::prelude::*, io::BufReader, io::BufWriter};
-const DEFAULT_PATH: &str = "/home/selmant";
+pub const DEFAULT_PATH: &str = "/home/selmant";
 const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 const FLAG_BYTE: u8 = 3;
 
