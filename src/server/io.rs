@@ -36,7 +36,7 @@ impl IOOperationHandler {
             Pwd => Ok(self.pwd(command)),
             Pushd { .. } => Ok(self.pushd(command)),
             Popd => self.popd(command),
-            UnknowCommand {..} => self.unkown_command(command),
+            UnknowCommand { .. } => self.unkown_command(command),
         }
     }
 
@@ -76,17 +76,19 @@ impl IOOperationHandler {
     fn touch(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Touch { file } = command {
             let path = PathBuf::from(file);
-            if path.is_file(){
+            if path.is_file() {
                 fs::File::open(path)?;
-            }
-            else{
+            } else {
                 fs::File::create(file)?;
-            } 
+            }
         }
         Ok(None)
     }
-    fn unkown_command(&self, command: Commands) -> std::io::Result<Option<String>> {
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Command not found."))
+    fn unkown_command(&self, _: Commands) -> std::io::Result<Option<String>> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Command not found.",
+        ))
     }
     fn rmdir(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Rmdir { path, parent } = command {

@@ -45,7 +45,6 @@ impl UserSession {
             self.perform_operations(s.as_str());
             buf.clear();
         }
-        //
     }
     fn perform_operations(&mut self, input: &str) {
         let stream_clone = self.stream.try_clone().unwrap();

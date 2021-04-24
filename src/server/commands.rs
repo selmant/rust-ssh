@@ -1,5 +1,4 @@
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum Commands<'a> {
     Mkdir {
         path: &'a str,
@@ -42,7 +41,7 @@ pub(crate) enum Commands<'a> {
         path: &'a str,
     },
     Popd,
-    UnknowCommand{
+    UnknowCommand {
         command: &'a str,
     },
 }
@@ -115,7 +114,7 @@ impl<'a> Commands<'a> {
             Pwd => "pwd".to_string(),
             Pushd { .. } => "pushd".to_string(),
             Popd => "popd".to_string(),
-            UnknowCommand{command} => command.to_string(),
+            UnknowCommand { command } => command.to_string(),
         }
     }
     pub(crate) fn new(command: &'a str) -> Commands<'a> {
