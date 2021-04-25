@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+pub(crate) const IO_COMMAND_ARRAY: [&str; 11] = ["mkdir", "rm", "rmdir", "ls", "cp", "mv", "touch", "cd", "pwd", "pushd", "popd"];
 #[derive(Debug, Clone)]
 pub(crate) enum Commands<'a> {
     Mkdir {
@@ -14,7 +16,6 @@ pub(crate) enum Commands<'a> {
         parent: bool,
     },
     Ls {
-        all: bool,
         almost_all: bool,
         list: bool,
         reverse: bool,
@@ -97,6 +98,10 @@ impl<'a> Opts<'a> {
     fn nth_non_option(&self, index: usize) -> &'a str {
         self.non_options[index]
     }
+
+    fn mandatory_count(&self) -> u8 {
+        self.non_options.len().try_into().unwrap()
+    }
 }
 
 impl<'a> Commands<'a> {
@@ -122,18 +127,18 @@ impl<'a> Commands<'a> {
         let opts = Opts::new(words);
 
         match opts.command {
-            "mkdir" => Commands::generate_mkdir(opts),
-            "rm" => Commands::generate_rm(opts),
-            "rmdir" => Commands::generate_rmdir(opts),
-            "ls" => Commands::generate_ls(opts),
-            "cp" => Commands::generate_cp(opts),
-            "mv" => Commands::generate_mv(opts),
-            "touch" => Commands::generate_touch(opts),
-            "cd" => Commands::generate_cd(opts),
+            "mkdir" => Commands::check_mandory_args_and_generate(&Commands::generate_mkdir, opts, 1),
+            "rm" => Commands::check_mandory_args_and_generate(&Commands::generate_rm, opts, 1),
+            "rmdir" => Commands::check_mandory_args_and_generate(&Commands::generate_rmdir, opts, 1),
+            "ls" => Commands::check_mandory_args_and_generate(&Commands::generate_ls, opts, 0),
+            "cp" => Commands::check_mandory_args_and_generate(&Commands::generate_cp, opts, 2),
+            "mv" => Commands::check_mandory_args_and_generate(&Commands::generate_mv, opts, 2),
+            "touch" => Commands::check_mandory_args_and_generate(&Commands::generate_touch, opts, 1),
+            "cd" => Commands::check_mandory_args_and_generate(&Commands::generate_cd, opts, 1),
             "pwd" => Commands::Pwd,
-            "pushd" => Commands::generate_pushd(opts),
+            "pushd" => Commands::check_mandory_args_and_generate(&Commands::generate_pushd, opts, 1),
             "popd" => Commands::Popd,
-            _ => Commands::generate_unknown(opts),
+            _ => Commands::check_mandory_args_and_generate(&Commands::generate_unknown, opts, 1),
         }
     }
     fn generate_unknown(opts: Opts) -> Commands {
@@ -165,7 +170,6 @@ impl<'a> Commands<'a> {
     }
     fn generate_ls(opts: Opts) -> Commands {
         Commands::Ls {
-            all: opts.is_exist(Some("all"), Some('a')),
             almost_all: opts.is_exist(Some("almost-all"), Some('A')),
             list: opts.is_exist(Some("list"), Some('l')),
             reverse: opts.is_exist(Some("reverse"), Some('r')),
@@ -197,6 +201,15 @@ impl<'a> Commands<'a> {
     fn generate_pushd(opts: Opts) -> Commands {
         Commands::Pushd {
             path: opts.nth_non_option(0),
+        }
+    }
+
+    fn check_mandory_args_and_generate(generator: &dyn Fn(Opts) -> Commands, opts: Opts<'a>, mandatory_count: u8) -> Commands<'a>{
+        if opts.mandatory_count() < mandatory_count {
+            Self::generate_unknown(opts)
+        }
+        else{
+            generator(opts)
         }
     }
 }

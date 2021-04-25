@@ -1,6 +1,7 @@
 use crate::commands::Commands::{
     self, Cd, Cp, Ls, Mkdir, Mv, Popd, Pushd, Pwd, Rm, Rmdir, Touch, UnknowCommand,
 };
+use crate::commands::IO_COMMAND_ARRAY;
 use std::{
     fs::{self, DirEntry},
     io::Error,
@@ -44,7 +45,7 @@ impl IOOperationHandler {
         if let Cp {
             source,
             destination,
-            recursive,
+            recursive: _,
             symlink,
         } = command
         {
@@ -84,10 +85,16 @@ impl IOOperationHandler {
         }
         Ok(None)
     }
-    fn unkown_command(&self, _: Commands) -> std::io::Result<Option<String>> {
+    fn unkown_command(&self, command: Commands) -> std::io::Result<Option<String>> {
+        let mut error_message = None;
+        if let UnknowCommand { command } = command {
+            if IO_COMMAND_ARRAY.contains(&command) {
+                error_message = Some("Missing operands.")
+            }
+        }
         Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            "Command not found.",
+            error_message.unwrap_or("Command not found."),
         ))
     }
     fn rmdir(&self, command: Commands) -> std::io::Result<Option<String>> {
@@ -188,7 +195,6 @@ impl IOOperationHandler {
     }
     fn ls(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Ls {
-            all,
             almost_all,
             list,
             recursive,
@@ -200,11 +206,44 @@ impl IOOperationHandler {
                 &mut folder_vec,
                 self.working_directory.as_path(),
                 recursive,
-                all || almost_all,
+                almost_all,
             )?;
-            println!("{:#?}", folder_vec)
-        }
+            println!("{:#?}", folder_vec);
 
+            let display_entry = |entry: DirEntry| match list {
+                false => format!("{} ", entry.file_name().to_str().unwrap()),
+                true => {
+                    let metadata = entry.metadata().unwrap();
+                    let datetime: chrono::DateTime<chrono::offset::Local> =
+                        metadata.created().unwrap().into();
+                    format!(
+                        "\n{:>8} {:20} {}",
+                        metadata.len(),
+                        datetime.format("%d/%m/%Y %T"),
+                        entry.file_name().to_str().unwrap()
+                    )
+                }
+            };
+
+            let mut output = String::new();
+            let entry_count: usize = folder_vec.iter().map(|inner| inner.len()).sum();
+            output.reserve(if list {
+                entry_count * 45
+            } else {
+                entry_count * 10
+            });
+            
+            for mut dir_vec in folder_vec {
+                if reverse {
+                    dir_vec.reverse();
+                }
+                for entry in dir_vec {
+                    output.push_str(display_entry(entry).as_str());
+                }
+                output.push_str("\n\n");
+            }
+            return Ok(Some(output));
+        }
         Ok(None)
     }
 
@@ -219,27 +258,25 @@ impl IOOperationHandler {
         folder_vec: &mut Vec<Vec<DirEntry>>,
         path: &Path,
         recursive: bool,
-        show_hidden: bool,
+        almost_all: bool,
     ) -> Result<String, std::io::Error> {
         let mut dir_vec = Vec::new();
         let hidden_filter = |wrapped_entry: &Result<DirEntry, Error>| {
-            if show_hidden {
+            if !almost_all {
                 if let Ok(entry) = wrapped_entry {
                     return !entry.file_name().to_str().unwrap().starts_with('.');
                 }
             }
-            true
+            false
         };
-
         for entry in path.read_dir()?.filter(hidden_filter) {
             let entry_unwrapped = entry.unwrap();
-
             if recursive && entry_unwrapped.metadata().as_ref().unwrap().is_dir() {
                 Self::perform_ls(
                     folder_vec,
                     entry_unwrapped.path().as_path(),
                     recursive,
-                    show_hidden,
+                    almost_all,
                 )?;
             }
             dir_vec.push(entry_unwrapped);

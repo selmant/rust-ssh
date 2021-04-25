@@ -31,9 +31,6 @@ impl UserSession {
     }
 
     pub(crate) fn start_session(&mut self) {
-        //let stream_clone = self.stream.try_clone().unwrap();
-        //let mut reader = BufReader::new(stream_clone);
-
         let mut buf = Vec::new();
 
         loop {
@@ -55,9 +52,6 @@ impl UserSession {
         }
     }
     fn perform_operations(&mut self, input: &str) {
-        //let stream_clone = self.stream.try_clone().unwrap();
-        //let mut writer = BufWriter::new(stream_clone);
-
         let command = Commands::new(input);
         println!("{:?}", command);
         let result = self.io_handler.perform_operation(command.clone());
