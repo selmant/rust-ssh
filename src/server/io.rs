@@ -2,11 +2,7 @@ use crate::commands::Commands::{
     self, Cd, Cp, Ls, Mkdir, Mv, Popd, Pushd, Pwd, Rm, Rmdir, Touch, UnknowCommand,
 };
 use crate::commands::IO_COMMAND_ARRAY;
-use std::{
-    fs::{self, DirEntry},
-    io::Error,
-    path::{Path, PathBuf},
-};
+use std::{fs::{self, DirEntry}, io::Error, path::{Path, PathBuf}};
 #[allow(clippy::clippy::upper_case_acronyms)]
 pub(crate) struct IOOperationHandler {
     working_directory: PathBuf,
@@ -41,6 +37,10 @@ impl IOOperationHandler {
         }
     }
 
+    pub(crate) fn get_wd(&self) -> &PathBuf {
+        &self.working_directory
+    }
+
     fn cp(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Cp {
             source,
@@ -49,10 +49,12 @@ impl IOOperationHandler {
             symlink,
         } = command
         {
+            let source_path = self.working_directory.join(source);
+            let destination_path = self.working_directory.join(destination);
             if symlink {
-                std::os::unix::fs::symlink(source, destination)?;
+                std::os::unix::fs::symlink(source_path, destination_path)?;
             } else {
-                fs::copy(source, destination)?;
+                fs::copy(source_path, destination_path)?;
             }
         }
         Ok(None)
@@ -63,12 +65,13 @@ impl IOOperationHandler {
             destination,
         } = command
         {
-            let source_path = PathBuf::from(source);
+            let source_path = self.working_directory.join(source);
+            let destination_path = self.working_directory.join(destination);
             match source_path.metadata().unwrap().permissions().readonly() {
                 true => fs::remove_file(source_path)?,
                 false => {
-                    fs::copy(source, destination)?;
-                    fs::remove_file(source)?;
+                    fs::copy(&source_path, destination_path)?;
+                    fs::remove_file(source_path)?;
                 }
             }
         }
@@ -76,11 +79,11 @@ impl IOOperationHandler {
     }
     fn touch(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Touch { file } = command {
-            let path = PathBuf::from(file);
+            let path = self.working_directory.join(PathBuf::from(file));
             if path.is_file() {
                 fs::File::open(path)?;
             } else {
-                fs::File::create(file)?;
+                fs::File::create(path)?;
             }
         }
         Ok(None)
@@ -88,7 +91,7 @@ impl IOOperationHandler {
     fn unkown_command(&self, command: Commands) -> std::io::Result<Option<String>> {
         let mut error_message = None;
         if let UnknowCommand { command } = command {
-            if IO_COMMAND_ARRAY.contains(&command) {
+            if IO_COMMAND_ARRAY.to_vec().iter().any(|x| x.0 == command) {
                 error_message = Some("Missing operands.")
             }
         }
@@ -99,7 +102,7 @@ impl IOOperationHandler {
     }
     fn rmdir(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Rmdir { path, parent } = command {
-            let path = PathBuf::from(path);
+            let path = self.working_directory.join(path);
             let mut remove_leaf_path = self.working_directory.clone();
             remove_leaf_path.push(path);
             match parent {
@@ -117,8 +120,7 @@ impl IOOperationHandler {
             directory,
         } = command
         {
-            let mut rm_path = self.working_directory.clone();
-            rm_path.push(path);
+            let rm_path = self.working_directory.join(path);
             match directory {
                 true => {
                     return self.rmdir(Commands::Rmdir {
@@ -164,8 +166,6 @@ impl IOOperationHandler {
     fn pushd(&mut self, command: Commands) -> Option<String> {
         if let Pushd { path } = command {
             self.directory_stack.push(path.to_string());
-
-            return Some(crate::session::DEFAULT_PATH.to_string());
         }
         None
     }
@@ -177,7 +177,9 @@ impl IOOperationHandler {
                     "Directory stack is empty.",
                 ));
             } else {
-                return Ok(self.directory_stack.pop());
+                let last = self.directory_stack.pop();
+                self.working_directory = PathBuf::from(last.clone().unwrap());
+                return Ok(last);
             }
         }
         Ok(None)
@@ -232,7 +234,7 @@ impl IOOperationHandler {
             } else {
                 entry_count * 10
             });
-            
+
             for mut dir_vec in folder_vec {
                 if reverse {
                     dir_vec.reverse();

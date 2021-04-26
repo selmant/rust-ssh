@@ -14,7 +14,7 @@ fn main() {
 }
 
 fn input_loop(client: &mut Client) {
-    println!("Console is active. Please enter your command (type quit/q for exit :");
+    println!("Console is active. Please enter your command (type quit/q for exit) :");
     let mut input = String::new();
     loop {
         println!();
@@ -29,8 +29,16 @@ fn input_loop(client: &mut Client) {
         }
 
         let output: String = client.execute_command(input.as_str());
+
+        if (input.starts_with("cd ") && !output.starts_with("cd: "))
+            || input.starts_with("popd") && !output.starts_with("popd: ")
+        {
+            client.wd = output.clone();
+        }
+        else {
+            println!("  {}", output);
+        }
         input.clear();
-        println!("  {}", output);
     }
 }
 
@@ -68,19 +76,13 @@ impl Client {
         };
         output_buf.pop();
 
-        let output = String::from_utf8(output_buf).unwrap();
-        if (input.starts_with("cd ") && !output.starts_with("cd: "))
-            || input == "popd" && !output.starts_with("popd: ")
-        {
-            self.wd = output.clone();
-        }
-
-        output
+        String::from_utf8(output_buf).unwrap()
     }
     fn restore_session_and_try_again(&mut self, input: &str) -> String {
         let new_connection = TcpStream::connect(SERVER_IP).expect("couldn't connect to server");
+        let temp_wd = self.wd.clone();
         *self = Client::new(new_connection);
-        self.wd = self.execute_command(format!("cd {}\n", self.wd).as_str());
+        self.wd = self.execute_command(format!("cd {}\n", temp_wd).as_str());
         self.execute_command(input)
     }
 

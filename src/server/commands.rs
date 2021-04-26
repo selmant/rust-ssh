@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-pub(crate) const IO_COMMAND_ARRAY: [&str; 11] = ["mkdir", "rm", "rmdir", "ls", "cp", "mv", "touch", "cd", "pwd", "pushd", "popd"];
+pub(crate) const IO_COMMAND_ARRAY: [(&str,u8); 11] = [("mkdir", 1), ("rm", 1), ("rmdir", 1), ("ls", 0), ("cp", 2), ("mv",2), ("touch",1), ("cd", 1), ("pwd", 0), ("pushd",0), ("popd",0)];
 #[derive(Debug, Clone)]
 pub(crate) enum Commands<'a> {
     Mkdir {
@@ -52,10 +52,11 @@ struct Opts<'a> {
     single_dash_options: Vec<&'a str>,
     double_dash_options: Vec<&'a str>,
     non_options: Vec<&'a str>,
+    wd: &'a str,
 }
 
 impl<'a> Opts<'a> {
-    fn new(mut words: Vec<&'a str>) -> Opts<'a> {
+    fn new(mut words: Vec<&'a str> , wd: &'a str) -> Opts<'a> {
         let command = words.remove(0);
         let non_options = words
             .iter()
@@ -77,6 +78,7 @@ impl<'a> Opts<'a> {
             single_dash_options,
             double_dash_options,
             non_options,
+            wd
         }
     }
     fn is_exist(&self, double_dash: Option<&str>, single_dash: Option<char>) -> bool {
@@ -122,23 +124,29 @@ impl<'a> Commands<'a> {
             UnknowCommand { command } => command.to_string(),
         }
     }
-    pub(crate) fn new(command: &'a str) -> Commands<'a> {
+    pub(crate) fn new(command: &'a str, wd : &'a str) -> Commands<'a> {
         let words = command.split(' ').collect();
-        let opts = Opts::new(words);
+        let opts = Opts::new(words, wd);
+
+        for (cmd, mandatory_count) in IO_COMMAND_ARRAY.to_vec() {
+            if command == cmd && opts.mandatory_count() < mandatory_count {
+                return Commands::generate_unknown(opts);
+            }
+        }
 
         match opts.command {
-            "mkdir" => Commands::check_mandory_args_and_generate(&Commands::generate_mkdir, opts, 1),
-            "rm" => Commands::check_mandory_args_and_generate(&Commands::generate_rm, opts, 1),
-            "rmdir" => Commands::check_mandory_args_and_generate(&Commands::generate_rmdir, opts, 1),
-            "ls" => Commands::check_mandory_args_and_generate(&Commands::generate_ls, opts, 0),
-            "cp" => Commands::check_mandory_args_and_generate(&Commands::generate_cp, opts, 2),
-            "mv" => Commands::check_mandory_args_and_generate(&Commands::generate_mv, opts, 2),
-            "touch" => Commands::check_mandory_args_and_generate(&Commands::generate_touch, opts, 1),
-            "cd" => Commands::check_mandory_args_and_generate(&Commands::generate_cd, opts, 1),
+            "mkdir" =>Commands::generate_mkdir(opts),
+            "rm" => Commands::generate_rm(opts),
+            "rmdir" =>Commands::generate_rmdir(opts),
+            "ls" => Commands::generate_ls(opts),
+            "cp" => Commands::generate_cp(opts),
+            "mv" => Commands::generate_mv(opts),
+            "touch" =>Commands::generate_touch(opts),
+            "cd" => Commands::generate_cd(opts),
             "pwd" => Commands::Pwd,
-            "pushd" => Commands::check_mandory_args_and_generate(&Commands::generate_pushd, opts, 1),
+            "pushd" =>Commands::generate_pushd(opts),
             "popd" => Commands::Popd,
-            _ => Commands::check_mandory_args_and_generate(&Commands::generate_unknown, opts, 1),
+            _ => Commands::generate_unknown(opts),
         }
     }
     fn generate_unknown(opts: Opts) -> Commands {
@@ -147,7 +155,6 @@ impl<'a> Commands<'a> {
         }
     }
     fn generate_cp(opts: Opts) -> Commands {
-        //let recursive= split.filter(|&word| word == "--recursive");
         Commands::Cp {
             source: opts.nth_non_option(0),
             destination: opts.nth_non_option(1),
@@ -200,16 +207,7 @@ impl<'a> Commands<'a> {
     }
     fn generate_pushd(opts: Opts) -> Commands {
         Commands::Pushd {
-            path: opts.nth_non_option(0),
-        }
-    }
-
-    fn check_mandory_args_and_generate(generator: &dyn Fn(Opts) -> Commands, opts: Opts<'a>, mandatory_count: u8) -> Commands<'a>{
-        if opts.mandatory_count() < mandatory_count {
-            Self::generate_unknown(opts)
-        }
-        else{
-            generator(opts)
+            path: opts.wd
         }
     }
 }

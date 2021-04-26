@@ -46,13 +46,14 @@ impl UserSession {
             };
             //Pop FLAG_BYTE from buffer.
             buf.pop();
-            let s = String::from_utf8(buf.clone()).expect("invalid ut-8");
-            self.perform_operations(s.as_str());
+            let input = String::from_utf8(buf.clone()).expect("invalid utf-8");
+            self.perform_operations(input.as_str());
             buf.clear();
         }
     }
     fn perform_operations(&mut self, input: &str) {
-        let command = Commands::new(input);
+        let wd = self.io_handler.get_wd().to_string_lossy().to_string();
+        let command = Commands::new(input, wd.as_str());
         println!("{:?}", command);
         let result = self.io_handler.perform_operation(command.clone());
         let output = match result {
