@@ -9,11 +9,11 @@ const FLAG_BYTE: u8 = 3;
 fn main() {
     let socket = TcpStream::connect(SERVER_IP).expect("couldn't connect to server");
 
-    let mut client = Client::new(socket);
-    input_loop(&mut client);
+    let client = Client::new(socket);
+    input_loop(client);
 }
 
-fn input_loop(client: &mut Client) {
+fn input_loop(mut client: Client) {
     println!("Console is active. Please enter your command (type quit/q for exit) :");
     let mut input = String::new();
     loop {
@@ -33,7 +33,7 @@ fn input_loop(client: &mut Client) {
         if (input.starts_with("cd ") && !output.starts_with("cd: "))
             || input.starts_with("popd") && !output.starts_with("popd: ")
         {
-            client.wd = output.clone();
+            client.wd = output;
         }
         else {
             println!("  {}", output);
@@ -55,7 +55,12 @@ impl Client {
         let reader = BufReader::new(socket);
         let writer = BufWriter::new(socket_clone);
         let mut client = Client { wd, reader, writer };
-        client.wd = client.execute_command("pwd\n");
+
+        let output =client.execute_command("pwd\n");
+        if !output.starts_with("cd: ") {
+            client.wd = output;
+        }
+        
         client
     }
 
@@ -82,8 +87,15 @@ impl Client {
         let new_connection = TcpStream::connect(SERVER_IP).expect("couldn't connect to server");
         let temp_wd = self.wd.clone();
         *self = Client::new(new_connection);
-        self.wd = self.execute_command(format!("cd {}\n", temp_wd).as_str());
-        self.execute_command(input)
+
+        let output = self.execute_command(format!("cd {}\n", temp_wd).as_str());
+        if !output.starts_with("cd: ") {
+            self.wd = output;
+            self.execute_command(input)
+        }
+        else {
+            "Something went wrong. Directory Changed to \"/\" and command didn't executed. ".to_string()
+        }
     }
 
     fn handle_socket_error(&mut self, err: std::io::Error, input: &str) -> String {

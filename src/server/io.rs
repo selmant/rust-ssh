@@ -103,11 +103,9 @@ impl IOOperationHandler {
     fn rmdir(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Rmdir { path, parent } = command {
             let path = self.working_directory.join(path);
-            let mut remove_leaf_path = self.working_directory.clone();
-            remove_leaf_path.push(path);
             match parent {
-                false => fs::remove_dir(remove_leaf_path)?,
-                true => fs::remove_dir_all(remove_leaf_path)?,
+                false => fs::remove_dir(path)?,
+                true => fs::remove_dir_all(path)?,
             }
         };
         Ok(None)
@@ -153,11 +151,10 @@ impl IOOperationHandler {
     }
     fn mkdir(&self, command: Commands) -> std::io::Result<Option<String>> {
         if let Mkdir { path, parent } = command {
-            let mut dir_path = self.working_directory.clone();
-            dir_path.push(path);
+            let path = self.working_directory.join(path);
             match parent {
-                true => fs::create_dir_all(dir_path)?,
-                false => fs::create_dir(dir_path)?,
+                true => fs::create_dir_all(path)?,
+                false => fs::create_dir(path)?,
             };
         }
         Ok(None)

@@ -11,7 +11,7 @@ fn main() {
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        println!("{:?}", stream);
+        println!("New connection {:?}", stream);
         thread::spawn(move || {
             handle_connection(stream);
         });

@@ -31,24 +31,22 @@ impl UserSession {
     }
 
     pub(crate) fn start_session(&mut self) {
-        let mut buf = Vec::new();
-
         loop {
+            let mut buf = Vec::new();
             match self.reader.read_until(FLAG_BYTE, &mut buf) {
                 Ok(0) => break,
-                Ok(bytes) => bytes,
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::WouldBlock {
                         panic!("{}", e);
                     }
                     break;
                 }
+                _ => {}
             };
             //Pop FLAG_BYTE from buffer.
             buf.pop();
-            let input = String::from_utf8(buf.clone()).expect("invalid utf-8");
+            let input = String::from_utf8(buf).expect("invalid utf-8");
             self.perform_operations(input.as_str());
-            buf.clear();
         }
     }
     fn perform_operations(&mut self, input: &str) {
