@@ -1,0 +1,21 @@
+[package]
+name = "ssh"
+version = "0.1.0"
+authors = ["selmant"]
+edition = "2018"
+default-run = "server"
+
+[[bin]]
+name = "server"
+path = "src/server/server.rs"
+
+
+[[bin]]
+name = "client"
+path = "src/client/client.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4"
+tokio = { version = "1.5.0", features = ["full"] }
