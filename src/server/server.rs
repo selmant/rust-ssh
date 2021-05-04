@@ -2,23 +2,23 @@ mod commands;
 mod io;
 mod session;
 
-use std::net::{TcpListener, TcpStream};
-use std::thread;
+use tokio::net::{TcpListener, TcpStream};
 const SERVER_IP: &str = "192.168.0.17:3000";
 
-fn main() {
-    let listener = TcpListener::bind(SERVER_IP).unwrap();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind(SERVER_IP).await?;
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
+    loop {
+        let (stream, _) = listener.accept().await?;
         println!("New connection {:?}", stream);
-        thread::spawn(move || {
-            handle_connection(stream);
+        tokio::spawn(async move {
+            handle_connection(stream).await;
         });
     }
 }
 
-fn handle_connection(stream: TcpStream) {
+async fn handle_connection(stream: TcpStream) {
     let mut session = session::UserSession::new(stream);
-    session.start_session();
+    session.start_session().await.unwrap();
 }

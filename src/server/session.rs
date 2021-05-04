@@ -1,55 +1,40 @@
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
+use tokio::net::TcpStream;
+
 use crate::{commands::Commands, io::IOOperationHandler};
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::time::Duration;
-use std::{io::prelude::*, io::BufReader, io::BufWriter};
 pub const DEFAULT_PATH: &str = "/home/selmant";
-const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const FLAG_BYTE: u8 = 3;
 
 pub(crate) struct UserSession {
-    reader: BufReader<TcpStream>,
-    writer: BufWriter<TcpStream>,
+    stream: BufStream<TcpStream>,
     io_handler: IOOperationHandler,
 }
 
 impl UserSession {
-    pub(crate) fn new(stream: TcpStream) -> UserSession {
+    pub(crate) fn new(socket: TcpStream) -> UserSession {
         let wd = PathBuf::from_str(DEFAULT_PATH).unwrap();
         let io_handler = IOOperationHandler::new(wd);
 
-        stream.set_read_timeout(Some(IDLE_TIMEOUT)).unwrap();
-        let stream_clone = stream.try_clone().unwrap();
-        let reader = BufReader::new(stream);
-        let writer = BufWriter::new(stream_clone);
+        let stream = BufStream::new(socket);
         UserSession {
-            reader,
-            writer,
+            stream,
             io_handler,
         }
     }
 
-    pub(crate) fn start_session(&mut self) {
+    pub(crate) async fn start_session(&mut self) -> tokio::io::Result<()>  {
         loop {
             let mut buf = Vec::new();
-            match self.reader.read_until(FLAG_BYTE, &mut buf) {
-                Ok(0) => break,
-                Err(e) => {
-                    if e.kind() != std::io::ErrorKind::WouldBlock {
-                        panic!("{}", e);
-                    }
-                    break;
-                }
-                _ => {}
-            };
+            self.stream.read_until(FLAG_BYTE, &mut buf).await?;
             //Pop FLAG_BYTE from buffer.
             buf.pop();
             let input = String::from_utf8(buf).expect("invalid utf-8");
-            self.perform_operations(input.as_str());
+            self.perform_operations(input.as_str()).await?;
         }
     }
-    fn perform_operations(&mut self, input: &str) {
+    async fn perform_operations(&mut self, input: &str) -> tokio::io::Result<()> {
         let wd = self.io_handler.get_wd().to_string_lossy().to_string();
         let command = Commands::new(input, wd.as_str());
         println!("{:?}", command);
@@ -62,21 +47,14 @@ impl UserSession {
         let mut bytes = output.into_bytes();
         bytes.push(FLAG_BYTE);
         println!("writed");
-        if let Err(e) = self.writer.write_all(&bytes) {
-            if e.kind() != std::io::ErrorKind::WouldBlock {
-                panic!("{}", e);
-            }
-        }
-        if let Err(e) = self.writer.flush() {
-            if e.kind() != std::io::ErrorKind::WouldBlock {
-                panic!("{}", e);
-            }
-        }
+        self.stream.write_all(&bytes).await?;
+        self.stream.flush().await?;
+        Ok(())
     }
 }
 
 impl Drop for UserSession {
     fn drop(&mut self) {
-        println!("{:?} UserSession dropped.", self.reader.get_ref());
+        println!("{:?} UserSession dropped.", self.stream.get_ref());
     }
 }
